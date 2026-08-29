@@ -1,0 +1,63 @@
+name: 공지사항 감시
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # 매시 정각(UTC). 실제 실행은 몇 분 지연될 수 있습니다.
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '실행 모드'
+        required: false
+        default: 'normal'
+        type: choice
+        options: [normal, seed, dry-run, login-test]
+
+concurrency:
+  group: notice-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: write        # state/seen.json 커밋용
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: 공지 확인 및 알림
+        env:
+          SITE_ID: ${{ secrets.SITE_ID }}
+          SITE_PW: ${{ secrets.SITE_PW }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          case "${{ inputs.mode }}" in
+            seed)       node src/index.js --seed ;;
+            dry-run)    node src/index.js --dry-run ;;
+            login-test) node src/index.js --login-test ;;
+            *)          node src/index.js ;;
+          esac
+
+      - name: 상태 저장
+        if: always()
+        run: |
+          if [[ -n "$(git status --porcelain state/)" ]]; then
+            git config user.name  "notice-watcher"
+            git config user.email "actions@github.com"
+            git add state/
+            git commit -m "chore: 확인한 공지 기록 갱신 [skip ci]"
+            git push
+          else
+            echo "변경 없음"
+          fi

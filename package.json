@@ -1,0 +1,24 @@
+{
+  "name": "doduck-notice-watcher",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "doduck.co.kr 공지사항 신규 게시글 감지 및 카카오톡/텔레그램 알림",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "seed": "node src/index.js --seed",
+    "dry": "node src/index.js --dry-run",
+    "login-test": "node src/index.js --login-test",
+    "check": "node tools/check-parse.mjs",
+    "test-notify": "node tools/test-notify.mjs",
+    "kakao-token": "node tools/kakao-token.mjs",
+    "telegram-chatid": "node tools/telegram-chatid.mjs"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "iconv-lite": "^0.6.3"
+  }
+}
