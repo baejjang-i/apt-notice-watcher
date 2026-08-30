@@ -10,7 +10,7 @@ on:
         required: false
         default: 'normal'
         type: choice
-        options: [normal, seed, dry-run, login-test, notify-test]
+        options: [normal, seed, dry-run, login-test, notify-test, telegram-diag]
 
 concurrency:
   group: notice-watch
@@ -43,11 +43,12 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           case "${{ inputs.mode }}" in
-            seed)        node src/index.js --seed ;;
-            dry-run)     node src/index.js --dry-run ;;
-            login-test)  node src/index.js --login-test ;;
-            notify-test) node tools/test-notify.mjs ;;
-            *)           node src/index.js ;;
+            seed)          node src/index.js --seed ;;
+            dry-run)       node src/index.js --dry-run ;;
+            login-test)    node src/index.js --login-test ;;
+            notify-test)   node tools/test-notify.mjs ;;
+            telegram-diag) node tools/telegram-chatid.mjs ;;
+            *)             node src/index.js ;;
           esac
 
       - name: 상태 저장
