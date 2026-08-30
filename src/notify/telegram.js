@@ -24,3 +24,61 @@ export async function sendTelegramChannel(text) {
   await sendTelegram(text, channelId);
   return true;
 }
+
+function requireToken() {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) throw new Error('TELEGRAM_BOT_TOKEN 환경변수가 없습니다');
+  return token;
+}
+
+// 본문 이미지 1장 전송. doduck.co.kr 이미지는 로그인 벽 뒤에 있어
+// 텔레그램 서버가 URL을 직접 가져올 수 없으므로, 우리가 먼저 내려받은
+// 바이트를 multipart로 업로드합니다.
+async function sendPhoto(chatId, image) {
+  const token = requireToken();
+  const form = new FormData();
+  form.set('chat_id', chatId);
+  form.set('photo', new Blob([image.buffer], { type: image.contentType }), 'image.jpg');
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+    method: 'POST',
+    body: form,
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(`텔레그램 이미지 발송 실패: ${json.description ?? JSON.stringify(json)}`);
+  return json;
+}
+
+// 이미지 2~10장은 앨범(sendMediaGroup)으로 한 번에 보냅니다.
+async function sendMediaGroup(chatId, images) {
+  const token = requireToken();
+  const form = new FormData();
+  form.set('chat_id', chatId);
+  form.set(
+    'media',
+    JSON.stringify(images.map((_, i) => ({ type: 'photo', media: `attach://photo${i}` })))
+  );
+  images.forEach((img, i) => {
+    form.set(`photo${i}`, new Blob([img.buffer], { type: img.contentType }), `image${i}.jpg`);
+  });
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {
+    method: 'POST',
+    body: form,
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(`텔레그램 앨범 발송 실패: ${json.description ?? JSON.stringify(json)}`);
+  return json;
+}
+
+// 이미지 배열을 chatId 하나에 전송. 10장 넘으면 앨범 단위로 나눕니다.
+export async function sendTelegramImages(chatId, images) {
+  if (!chatId || !images?.length) return;
+  if (images.length === 1) {
+    await sendPhoto(chatId, images[0]);
+    return;
+  }
+  for (let i = 0; i < images.length; i += 10) {
+    await sendMediaGroup(chatId, images.slice(i, i + 10));
+  }
+}

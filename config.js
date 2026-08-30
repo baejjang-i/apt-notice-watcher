@@ -1,7 +1,7 @@
 // 감시 대상 및 동작 설정. 사이트가 리뉴얼되면 대부분 이 파일만 고치면 됩니다.
 export default {
   site: {
-    name: '두덕 생활지원센터',
+    name: '도덕파크타운',
     base: 'http://www.doduck.co.kr',
     // 로그인 없이 신규 글을 감지하는 페이지 (메인)
     listUrl: 'http://www.doduck.co.kr/',
@@ -32,7 +32,7 @@ export default {
   // 제목에 아래 단어가 포함된 것만 알림. 비워두면 전체 알림.
   keywords: [],
 
-  // 알림 채널. 카카오가 주채널, 텔레그램이 보조/폴백.
+  // 알림 채널. 카카오가 주채널(본인 수신용), 텔레그램이 보조/폴백 겸 입주민 채널 발행용.
   notify: {
     kakao: { enabled: true },
     telegram: {
@@ -42,11 +42,10 @@ export default {
       mode: 'always',
 
       // 입주민 구독용 텔레그램 채널. TELEGRAM_CHANNEL_ID가 있을 때만 동작합니다.
+      // 채널 입장은 검수된 인원에게만 초대 링크를 공유하는 전제라, 본문을 그대로 공개합니다.
       channel: {
         enabled: true,
-        // 공지 본문은 로그인해야 볼 수 있는 회원 전용 내용이라
-        // 채널에는 기본적으로 제목·날짜·링크만 보냅니다.
-        includeBody: false,
+        includeBody: true,
       },
     },
   },
@@ -54,7 +53,12 @@ export default {
   // 상세 본문 취득 (로그인 필요). 실패해도 제목+링크 알림은 그대로 나갑니다.
   detail: {
     enabled: true,
-    maxBodyChars: 700,   // 알림에 담을 본문 최대 길이
+    maxBodyChars: 1500,   // 알림에 담을 본문 최대 길이
+    // 본문에 첨부된 이미지를 함께 전송할지 여부. 텔레그램(개인·채널)에만 적용됩니다.
+    // 카카오 "나에게 보내기"는 텍스트 템플릿만 지원해 이미지를 못 담습니다.
+    includeImages: true,
+    maxImages: 6,          // 글 하나당 첨부할 최대 이미지 수
+    maxImageBytes: 9 * 1024 * 1024, // 텔레그램 업로드 한도(약 10MB) 여유분
   },
 
   // 하루 1회 "정상 동작 중" 하트비트를 보낼 시각 (KST, 0~23). null이면 끔.

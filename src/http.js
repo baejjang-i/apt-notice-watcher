@@ -193,6 +193,15 @@ export async function getHtml(url, { label = url } = {}) {
   }, { label });
 }
 
+// 본문 첨부 이미지 등 바이너리 취득용. 상세 본문과 같은 세션 쿠키를 그대로 씁니다
+// (이미지도 로그인 벽 뒤에 있는 경우가 많습니다).
+export async function getBinary(url, { label = url } = {}) {
+  return withRetry(async () => {
+    const res = await requestFollow(url, { method: 'GET' });
+    return { buffer: res.body, contentType: res.headers['content-type'] ?? 'application/octet-stream' };
+  }, { label });
+}
+
 // EUC-KR 사이트이므로 폼 값도 EUC-KR로 퍼센트 인코딩해 보냅니다.
 function encodeFormEucKr(fields) {
   return Object.entries(fields)

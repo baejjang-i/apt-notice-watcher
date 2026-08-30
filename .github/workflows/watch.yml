@@ -2,9 +2,10 @@ name: 공지사항 감시
 
 on:
   schedule:
-    # 10분마다. GitHub Actions의 schedule은 정시를 보장하지 않아
-    # 부하 상황에 따라 실제로는 15~20분 간격이 될 수 있습니다.
-    - cron: '*/10 * * * *'
+    # 매분 실행 요청. Public 저장소라 무료·무제한이지만,
+    # GitHub 공식 문서상 예약 실행의 최소 보장 간격은 5분이라
+    # 실제로는 상당수가 스킵되어 체감 간격이 5~10분에 수렴할 수 있습니다.
+    - cron: '* * * * *'
   workflow_dispatch:
     inputs:
       mode:

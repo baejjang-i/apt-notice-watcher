@@ -2,7 +2,7 @@ import config from '../config.js';
 import { getHtml } from './http.js';
 import { parseNoticeList, applyFilters } from './parse.js';
 import { loadState, saveState, pickNew } from './state.js';
-import { login, fetchDetail, LoginError } from './detail.js';
+import { login, fetchDetail, fetchImages, LoginError } from './detail.js';
 import * as notifier from './notify/index.js';
 
 const args = new Set(process.argv.slice(2));
@@ -102,9 +102,13 @@ async function main() {
 
   for (const item of fresh) {
     let detail = null;
+    let images = [];
     if (loggedIn) {
       try {
         detail = await fetchDetail(item);
+        if (config.detail.includeImages && detail.images?.length) {
+          images = await fetchImages(detail.images);
+        }
       } catch (err) {
         console.error(`[warn] 상세 취득 실패 (${item.id}): ${err.message}`);
         if (err instanceof LoginError) loggedIn = false; // 세션이 끊긴 경우 이후 시도 생략
@@ -115,6 +119,7 @@ async function main() {
 
     if (DRY) {
       console.log('\n--- DRY RUN ---\n' + msg.fullText);
+      if (images.length) console.log(`(이미지 ${images.length}장 첨부 예정: ${images.map((i) => i.url).join(', ')})`);
       continue;
     }
 
@@ -130,6 +135,12 @@ async function main() {
     }
     if (res.kakao === 'failed') state.kakaoFailStreak += 1;
     else if (res.kakao === 'sent') state.kakaoFailStreak = 0;
+
+    // 이미지는 텍스트 알림이 최소 한 곳에는 나간 뒤 이어서 전송합니다 (카카오 미지원).
+    if (images.length && (res.telegram === 'sent' || res.channel === 'sent')) {
+      const imgRes = await notifier.sendImages(images);
+      console.log(`[send] ${item.id} images personal=${imgRes.personal} channel=${imgRes.channel}`);
+    }
 
     await new Promise((r) => setTimeout(r, 800)); // 연속 발송 간격
   }

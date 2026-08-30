@@ -1,6 +1,9 @@
 import * as cheerio from 'cheerio';
 import config from '../config.js';
-import { getHtml, postForm, clearCookies } from './http.js';
+import { getHtml, getBinary, postForm, clearCookies } from './http.js';
+
+// 아이콘/구분선 등 본문과 무관한 장식 이미지는 제외합니다.
+const DECORATIVE_IMG = /spacer|blank\.gif|icon_|btn_|line_|_bg\.(gif|png)/i;
 
 const LOGIN_WALL = /로그인하셔야|로그인 후 이용|이용권한이 없습니다/;
 
@@ -44,16 +47,32 @@ export function extractDetail(html) {
   }
 
   let best = '';
+  let bestEl = null;
   $('td, div').each((_, el) => {
     const $el = $(el);
     // 자식에 표/블록이 많으면 컨테이너일 뿐 본문이 아닙니다.
     if ($el.find('table, td, div').length > 2) return;
     const text = $el.text().replace(/\s+/g, ' ').trim();
-    if (text.length > best.length) best = text;
+    if (text.length > best.length) { best = text; bestEl = $el; }
   });
 
   const body = best.length >= 20 ? best : null;
-  return { title, body, blocked: LOGIN_WALL.test(html) };
+
+  // 본문 블록(WYSIWYG 에디터로 작성된 영역)에 인라인으로 들어간 이미지만 취합니다.
+  const images = [];
+  if (bestEl) {
+    bestEl.find('img').each((_, img) => {
+      const src = $(img).attr('src');
+      if (!src || DECORATIVE_IMG.test(src)) return;
+      try {
+        images.push(new URL(src, config.site.base).toString());
+      } catch {
+        /* 잘못된 URL은 건너뜀 */
+      }
+    });
+  }
+
+  return { title, body, images, blocked: LOGIN_WALL.test(html) };
 }
 
 export async function fetchDetail(item) {
@@ -61,4 +80,24 @@ export async function fetchDetail(item) {
   const d = extractDetail(html);
   if (d.blocked) throw new LoginError(`상세 ${item.id}이(가) 로그인 벽에 막혔습니다`);
   return d;
+}
+
+// 본문 이미지를 실제 바이트로 내려받습니다 (로그인 세션 재사용).
+// 실패한 개별 이미지는 건너뛰고 나머지는 그대로 진행합니다.
+export async function fetchImages(urls) {
+  const { maxImages, maxImageBytes } = config.detail;
+  const out = [];
+  for (const url of (urls ?? []).slice(0, maxImages)) {
+    try {
+      const { buffer, contentType } = await getBinary(url, { label: `이미지 ${url}` });
+      if (buffer.length > maxImageBytes) {
+        console.warn(`[warn] 이미지 용량 초과(${buffer.length}B), 건너뜀: ${url}`);
+        continue;
+      }
+      out.push({ buffer, contentType, url });
+    } catch (err) {
+      console.warn(`[warn] 이미지 다운로드 실패: ${url} (${err.message})`);
+    }
+  }
+  return out;
 }
