@@ -1,6 +1,6 @@
 import config from '../../config.js';
 import { getAccessToken, sendKakaoMemo } from './kakao.js';
-import { sendTelegram } from './telegram.js';
+import { sendTelegram, sendTelegramChannel } from './telegram.js';
 
 // 카카오 토큰은 실행당 한 번만 발급받아 재사용합니다.
 let cachedToken = null;
@@ -17,10 +17,11 @@ async function token() {
 /**
  * 카카오를 주채널로, 텔레그램을 보조/폴백으로 발송합니다.
  * 카카오 발송이 실패해도 텔레그램으로는 반드시 나가도록 서로를 격리합니다.
- * @returns {{kakao: 'sent'|'failed'|'off', telegram: 'sent'|'failed'|'off', errors: string[]}}
+ * 입주민 구독용 채널이 설정되어 있으면 그쪽에도 함께 발행합니다.
+ * @returns {{kakao,telegram,channel: 'sent'|'failed'|'off', errors: string[]}}
  */
-export async function notify({ kakaoText, fullText, linkUrl }) {
-  const result = { kakao: 'off', telegram: 'off', errors: [] };
+export async function notify({ kakaoText, fullText, channelText, linkUrl }) {
+  const result = { kakao: 'off', telegram: 'off', channel: 'off', errors: [] };
   const tg = config.notify.telegram;
 
   if (config.notify.kakao.enabled) {
@@ -43,6 +44,17 @@ export async function notify({ kakaoText, fullText, linkUrl }) {
     } catch (err) {
       result.telegram = 'failed';
       result.errors.push(`telegram: ${err.message}`);
+    }
+  }
+
+  // 입주민 채널은 개인 알림과 독립적으로 발행합니다.
+  if (tg.enabled && tg.channel?.enabled) {
+    try {
+      const sent = await sendTelegramChannel(channelText ?? fullText);
+      result.channel = sent ? 'sent' : 'off';
+    } catch (err) {
+      result.channel = 'failed';
+      result.errors.push(`channel: ${err.message}`);
     }
   }
   return result;

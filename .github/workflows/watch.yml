@@ -2,7 +2,9 @@ name: 공지사항 감시
 
 on:
   schedule:
-    - cron: '0 * * * *'   # 매시 정각(UTC). 실제 실행은 몇 분 지연될 수 있습니다.
+    # 10분마다. GitHub Actions의 schedule은 정시를 보장하지 않아
+    # 부하 상황에 따라 실제로는 15~20분 간격이 될 수 있습니다.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -41,6 +43,7 @@ jobs:
           KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
         run: |
           case "${{ inputs.mode }}" in
             seed)          node src/index.js --seed ;;

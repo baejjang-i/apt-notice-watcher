@@ -26,7 +26,14 @@ function buildMessages(item, detail) {
     `📢 새 공지 · ${config.site.name}\n\n` +
     `${title}\n${item.postedAt}\n\n${body}\n\n${item.url}`;
 
-  return { kakaoText, fullText, linkUrl: item.url };
+  // 입주민 채널은 불특정 다수가 볼 수 있으므로, 회원 전용 본문은 기본적으로 빼고
+  // 제목·날짜·링크만 발행합니다. (config.notify.telegram.channel.includeBody)
+  const channelText = config.notify.telegram.channel?.includeBody
+    ? fullText
+    : `📢 새 공지 · ${config.site.name}\n\n${title}\n${item.postedAt}\n\n` +
+      `아래 링크에서 확인하세요 (홈페이지 로그인 필요)\n${item.url}`;
+
+  return { kakaoText, fullText, channelText, linkUrl: item.url };
 }
 
 async function main() {
@@ -112,11 +119,11 @@ async function main() {
     }
 
     const res = await notifier.notify(msg);
-    console.log(`[send] ${item.id} kakao=${res.kakao} telegram=${res.telegram}`);
+    console.log(`[send] ${item.id} kakao=${res.kakao} telegram=${res.telegram} channel=${res.channel}`);
 
     // 어느 한 채널이라도 성공해야 "본 것"으로 처리합니다.
-    // 둘 다 실패하면 기록하지 않아 다음 실행에서 재시도됩니다.
-    if (res.kakao === 'sent' || res.telegram === 'sent') {
+    // 전부 실패하면 기록하지 않아 다음 실행에서 재시도됩니다.
+    if (res.kakao === 'sent' || res.telegram === 'sent' || res.channel === 'sent') {
       state.seenIds.push(item.id);
     } else {
       console.error(`[error] ${item.id} 전 채널 발송 실패: ${res.errors.join(' | ')}`);

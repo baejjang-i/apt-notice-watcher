@@ -40,6 +40,14 @@ export default {
       // 'always'   : 카카오와 항상 동시 발송 (도달 여부 비교용 · 초기 권장)
       // 'fallback' : 카카오 발송이 실패했을 때만 발송
       mode: 'always',
+
+      // 입주민 구독용 텔레그램 채널. TELEGRAM_CHANNEL_ID가 있을 때만 동작합니다.
+      channel: {
+        enabled: true,
+        // 공지 본문은 로그인해야 볼 수 있는 회원 전용 내용이라
+        // 채널에는 기본적으로 제목·날짜·링크만 보냅니다.
+        includeBody: false,
+      },
     },
   },
 
