@@ -33,43 +33,62 @@ export async function login(probeUrl) {
   return null;
 }
 
+// 이 사이트의 하위 페이지(메인 제외)는 전부 이 표 구조를 공유합니다.
+//   <table class="body_layout_c"><tr>
+//     <td style="width:190px">  좌측 퀵메뉴 + 로그인 박스 (#lmenu_v2 등)
+//     <td style="width:762px">  실제 게시글 내용
+// 좌측 칸에는 "소장인사말 직원현황 관리계획서 …" 같은 메뉴 텍스트가 줄줄이 이어져 있어,
+// 실제 본문이 "이미지만 있고 텍스트가 거의 없는" 글일 경우 이 메뉴 쪽이 더 길어서
+// 본문으로 잘못 뽑히는 문제가 있었습니다. 아예 스코프를 오른쪽 칸으로 좁혀 원천 차단합니다.
+function contentScope($) {
+  // cheerio가 HTML5 파서로 tbody를 자동 삽입하므로 두 형태를 모두 지원합니다.
+  const scope = $('table.body_layout_c > tbody > tr > td, table.body_layout_c > tr > td').last();
+  return scope.length ? scope : $('body'); // 템플릿이 다른 페이지면 문서 전체로 완화
+}
+
 // 상세 페이지에서 전체 제목과 본문을 뽑습니다.
-// 이 사이트는 테이블 레이아웃이라 고정 셀렉터가 없어, 텍스트가 가장 실한 블록을 고릅니다.
+// 이 사이트는 테이블 레이아웃이라 고정 셀렉터가 없어, 스코프 내에서 텍스트가 가장 실한
+// 블록을 고릅니다. 실제로 본문이 비어 있으면(이미지만 첨부) body는 null이 되는 게 맞습니다.
 export function extractDetail(html) {
   const $ = cheerio.load(html);
   $('script, style, noscript, iframe').remove();
+  const scope = contentScope($);
 
   let title = null;
-  // 상세 화면의 제목은 보통 td.td_subject 또는 굵은 헤더 셀에 들어갑니다.
   for (const sel of ['td.td_subject', '.board_view_title', 'h3', 'h2']) {
-    const t = $(sel).first().text().trim();
+    const t = scope.find(sel).first().text().trim();
     if (t && t.length > 1 && t.length < 200) { title = t; break; }
   }
 
   let best = '';
-  let bestEl = null;
-  $('td, div').each((_, el) => {
+  scope.find('td, div').each((_, el) => {
     const $el = $(el);
     // 자식에 표/블록이 많으면 컨테이너일 뿐 본문이 아닙니다.
     if ($el.find('table, td, div').length > 2) return;
     const text = $el.text().replace(/\s+/g, ' ').trim();
-    if (text.length > best.length) { best = text; bestEl = $el; }
+    if (text.length > best.length) best = text;
   });
-
   const body = best.length >= 20 ? best : null;
 
-  // 본문 블록(WYSIWYG 에디터로 작성된 영역)에 인라인으로 들어간 이미지만 취합니다.
+  // 이 사이트의 실제 첨부/본문 이미지는 전부 /board/attach/ 경로로 업로드됩니다.
+  // 이 패턴에 맞는 이미지를 우선 채택하고, 없을 때만 스코프 내 다른 이미지로 보완합니다.
+  const seen = new Set();
   const images = [];
-  if (bestEl) {
-    bestEl.find('img').each((_, img) => {
-      const src = $(img).attr('src');
-      if (!src || DECORATIVE_IMG.test(src)) return;
-      try {
-        images.push(new URL(src, config.site.base).toString());
-      } catch {
-        /* 잘못된 URL은 건너뜀 */
-      }
-    });
+  const pushImg = (src) => {
+    if (!src || DECORATIVE_IMG.test(src)) return;
+    try {
+      const abs = new URL(src, config.site.base).toString();
+      if (!seen.has(abs)) { seen.add(abs); images.push(abs); }
+    } catch {
+      /* 잘못된 URL은 건너뜀 */
+    }
+  };
+  scope.find('img').each((_, img) => {
+    const src = $(img).attr('src');
+    if (src && /\/board\/attach\//i.test(src)) pushImg(src);
+  });
+  if (images.length === 0) {
+    scope.find('img').each((_, img) => pushImg($(img).attr('src')));
   }
 
   return { title, body, images, blocked: LOGIN_WALL.test(html) };

@@ -44,11 +44,13 @@ async function main() {
     const html = await getHtml(config.site.listUrl, { label: '메인' });
     const probe = applyFilters(parseNoticeList(html))[0];
     if (!probe) throw new Error('로그인 테스트에 쓸 글을 찾지 못했습니다');
+    console.log(`  대상 글: [${probe.id}] ${probe.titleShort} (${probe.url})`);
     await login(probe.url);
     const d = await fetchDetail(probe);
     console.log('로그인 성공. 상세 취득 결과:');
     console.log(`  제목: ${d.title}`);
-    console.log(`  본문: ${(d.body ?? '').slice(0, 300)}`);
+    console.log(`  본문(${d.body?.length ?? 0}자): ${(d.body ?? '(없음)').slice(0, 300)}`);
+    console.log(`  이미지(${d.images.length}장): ${d.images.join(', ') || '(없음)'}`);
     return;
   }
 
