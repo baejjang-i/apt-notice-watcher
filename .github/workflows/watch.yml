@@ -12,7 +12,7 @@ on:
         required: false
         default: 'normal'
         type: choice
-        options: [normal, seed, dry-run, login-test, login-test-dump, notify-test, telegram-diag, admin-bot-diag]
+        options: [normal, seed, dry-run, login-test, login-test-dump, notify-test, alert-test, telegram-diag, admin-bot-diag]
 
 concurrency:
   group: notice-watch
@@ -53,6 +53,7 @@ jobs:
             login-test)       node src/index.js --login-test ;;
             login-test-dump)  node src/index.js --login-test --dump ;;
             notify-test)      node tools/test-notify.mjs ;;
+            alert-test)       node tools/test-alert.mjs ;;
             telegram-diag)    node tools/telegram-chatid.mjs ;;
             admin-bot-diag)   TELEGRAM_BOT_TOKEN="$TELEGRAM_ADMIN_BOT_TOKEN" node tools/telegram-chatid.mjs ;;
             *)                node src/index.js ;;
