@@ -43,7 +43,7 @@ function buildKakaoText(title, postedAt, body, url) {
   return head + urlPart;
 }
 
-function buildMessages(item, detail) {
+function buildMessages(item, detail, imageCount = 0) {
   const title = detail?.title || item.titleShort;
   const body = resolveBodyText(detail);
 
@@ -53,14 +53,20 @@ function buildMessages(item, detail) {
     `📢 새 공지 · ${config.site.name}\n\n` +
     `${title}\n${item.postedAt}\n\n${body}\n\n${item.url}`;
 
-  // 입주민 채널은 불특정 다수가 볼 수 있으므로, 회원 전용 본문은 기본적으로 빼고
-  // 제목·날짜·링크만 발행합니다. (config.notify.telegram.channel.includeBody)
-  const channelText = config.notify.telegram.channel?.includeBody
-    ? fullText
-    : `📢 새 공지 · ${config.site.name}\n\n${title}\n${item.postedAt}\n\n` +
-      `아래 링크에서 확인하세요 (홈페이지 로그인 필요)\n${item.url}`;
+  const linkOnly =
+    `📢 새 공지 · ${config.site.name}\n\n${title}\n${item.postedAt}\n\n` +
+    `아래 링크에서 확인하세요 (홈페이지 로그인 필요)\n${item.url}`;
 
-  return { kakaoText, fullText, channelText, linkUrl: item.url };
+  // 텔레그램 채널: 사진은 별도 메시지로 첨부되므로 텍스트에는 언급 불필요
+  const channelText = config.notify.telegram.channel?.includeBody ? fullText : linkOnly;
+
+  // 네이버 밴드: 사진 첨부 API가 없어 텍스트로만 발행. 사진이 있으면 링크로 유도.
+  const photoNote = imageCount > 0
+    ? `\n\n📷 첨부 사진 ${imageCount}장은 위 링크에서 확인하세요.`
+    : '';
+  const bandText = (config.notify.band?.includeBody ? fullText : linkOnly) + photoNote;
+
+  return { kakaoText, fullText, channelText, bandText, linkUrl: item.url };
 }
 
 async function main() {
@@ -149,20 +155,21 @@ async function main() {
       }
     }
 
-    const msg = buildMessages(item, detail);
+    const msg = buildMessages(item, detail, images.length);
 
     if (DRY) {
       console.log('\n--- DRY RUN ---\n' + msg.fullText);
       if (images.length) console.log(`(이미지 ${images.length}장 첨부 예정: ${images.map((i) => i.url).join(', ')})`);
+      console.log('\n--- 밴드 발행 예정 본문 ---\n' + msg.bandText);
       continue;
     }
 
     const res = await notifier.notify(msg);
-    console.log(`[send] ${item.id} kakao=${res.kakao} telegram=${res.telegram} channel=${res.channel}`);
+    console.log(`[send] ${item.id} kakao=${res.kakao} telegram=${res.telegram} channel=${res.channel} band=${res.band}`);
 
     // 어느 한 채널이라도 성공해야 "본 것"으로 처리합니다.
     // 전부 실패하면 기록하지 않아 다음 실행에서 재시도됩니다.
-    if (res.kakao === 'sent' || res.telegram === 'sent' || res.channel === 'sent') {
+    if (['kakao', 'telegram', 'channel', 'band'].some((k) => res[k] === 'sent')) {
       state.seenIds.push(item.id);
     } else {
       console.error(`[error] ${item.id} 전 채널 발송 실패: ${res.errors.join(' | ')}`);

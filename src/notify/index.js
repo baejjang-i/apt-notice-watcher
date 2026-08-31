@@ -1,6 +1,7 @@
 import config from '../../config.js';
 import { getAccessToken, sendKakaoMemo } from './kakao.js';
 import { sendTelegram, sendTelegramChannel, sendTelegramImages, sendTelegramAdmin } from './telegram.js';
+import { sendBandPost } from './band.js';
 
 // 카카오 토큰은 실행당 한 번만 발급받아 재사용합니다.
 let cachedToken = null;
@@ -17,11 +18,11 @@ async function token() {
 /**
  * 카카오를 주채널로, 텔레그램을 보조/폴백으로 발송합니다.
  * 카카오 발송이 실패해도 텔레그램으로는 반드시 나가도록 서로를 격리합니다.
- * 입주민 구독용 채널이 설정되어 있으면 그쪽에도 함께 발행합니다.
- * @returns {{kakao,telegram,channel: 'sent'|'failed'|'off', errors: string[]}}
+ * 입주민 구독용 채널(텔레그램 채널·네이버 밴드)이 설정되어 있으면 그쪽에도 함께 발행합니다.
+ * @returns {{kakao,telegram,channel,band: 'sent'|'failed'|'off', errors: string[]}}
  */
-export async function notify({ kakaoText, fullText, channelText, linkUrl }) {
-  const result = { kakao: 'off', telegram: 'off', channel: 'off', errors: [] };
+export async function notify({ kakaoText, fullText, channelText, bandText, linkUrl }) {
+  const result = { kakao: 'off', telegram: 'off', channel: 'off', band: 'off', errors: [] };
   const tg = config.notify.telegram;
 
   if (config.notify.kakao.enabled) {
@@ -55,6 +56,18 @@ export async function notify({ kakaoText, fullText, channelText, linkUrl }) {
     } catch (err) {
       result.channel = 'failed';
       result.errors.push(`channel: ${err.message}`);
+    }
+  }
+
+  // 네이버 밴드(입주민 주채널). 토큰/키가 없으면 조용히 건너뜁니다.
+  const band = config.notify.band;
+  if (band?.enabled && process.env.BAND_ACCESS_TOKEN && process.env.BAND_KEY) {
+    try {
+      await sendBandPost(bandText ?? fullText, { doPush: band.doPush });
+      result.band = 'sent';
+    } catch (err) {
+      result.band = 'failed';
+      result.errors.push(`band: ${err.message}`);
     }
   }
   return result;

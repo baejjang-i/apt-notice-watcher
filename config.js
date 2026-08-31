@@ -43,10 +43,20 @@ export default {
 
       // 입주민 구독용 텔레그램 채널. TELEGRAM_CHANNEL_ID가 있을 때만 동작합니다.
       // 채널 입장은 검수된 인원에게만 초대 링크를 공유하는 전제라, 본문을 그대로 공개합니다.
+      // 입주민 주채널이 네이버 밴드로 바뀌어, 필요 없으면 enabled: false로 끄면 됩니다.
       channel: {
         enabled: true,
         includeBody: true,
       },
+    },
+
+    // 입주민 주채널: 네이버 밴드. BAND_ACCESS_TOKEN / BAND_KEY가 있을 때만 동작합니다.
+    // 밴드 API는 사진 첨부가 불가능해 텍스트 + 링크로 발행하고, 사진이 있으면
+    // "사진 N장은 링크에서 확인" 안내를 덧붙입니다.
+    band: {
+      enabled: true,
+      doPush: true,        // 밴드 멤버에게 새 글 푸시 알림
+      includeBody: true,
     },
   },
 
