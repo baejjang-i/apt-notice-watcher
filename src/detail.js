@@ -46,32 +46,49 @@ function contentScope($) {
   return scope.length ? scope : $('body'); // 템플릿이 다른 페이지면 문서 전체로 완화
 }
 
-// 상세 페이지에서 전체 제목과 본문을 뽑습니다.
-// 이 사이트는 테이블 레이아웃이라 고정 셀렉터가 없어, 스코프 내에서 텍스트가 가장 실한
-// 블록을 고릅니다. 실제로 본문이 비어 있으면(이미지만 첨부) body는 null이 되는 게 맞습니다.
+// 실제 로그인된 상세 페이지 마크업을 확인해 얻은 이 사이트 고유의 정확한 컨테이너입니다.
+//   <div class="board_vtit">글 제목</div>
+//   <div class="view-content-box"> ... 실제 본문/이미지 ... </div>
+// 이전에는 "텍스트가 가장 긴 블록"을 고르는 휴리스틱을 썼는데, 같은 콘텐츠 칸 안에
+// 모든 글에 공통으로 붙는 안내 문구(.bodytit_sinfo, "사랑과 꿈이 있는 ○○ 아파트
+// 관리사무소 입니다.")가 있어 본문이 짧은(이미지만 첨부된) 글에서 그 문구가 본문으로
+// 잘못 뽑혔습니다. .view-content-box는 그 문구 바깥에 있어 정확히 걸러냅니다.
 export function extractDetail(html) {
   const $ = cheerio.load(html);
   $('script, style, noscript, iframe').remove();
   const scope = contentScope($);
 
-  let title = null;
-  for (const sel of ['td.td_subject', '.board_view_title', 'h3', 'h2']) {
-    const t = scope.find(sel).first().text().trim();
-    if (t && t.length > 1 && t.length < 200) { title = t; break; }
+  const titleEl = scope.find('.board_vtit').first();
+  let title = titleEl.length ? titleEl.text().trim() : null;
+  if (!title) {
+    // 템플릿이 다른 게시판 대비 폴백
+    for (const sel of ['td.td_subject', '.board_view_title', 'h3', 'h2']) {
+      const t = scope.find(sel).first().text().trim();
+      if (t && t.length > 1 && t.length < 200) { title = t; break; }
+    }
   }
 
-  let best = '';
-  scope.find('td, div').each((_, el) => {
-    const $el = $(el);
-    // 자식에 표/블록이 많으면 컨테이너일 뿐 본문이 아닙니다.
-    if ($el.find('table, td, div').length > 2) return;
-    const text = $el.text().replace(/\s+/g, ' ').trim();
-    if (text.length > best.length) best = text;
-  });
-  const body = best.length >= 20 ? best : null;
+  const contentBox = scope.find('.view-content-box').first();
+  const imgScope = contentBox.length ? contentBox : scope;
+
+  let body;
+  if (contentBox.length) {
+    const text = contentBox.text().replace(/\s+/g, ' ').trim();
+    body = text.length >= 20 ? text : null;
+  } else {
+    // 폴백: 문서 전체가 아닌 스코프 내에서 텍스트가 가장 긴 블록을 고릅니다.
+    let best = '';
+    scope.find('td, div').each((_, el) => {
+      const $el = $(el);
+      if ($el.find('table, td, div').length > 2) return;
+      const text = $el.text().replace(/\s+/g, ' ').trim();
+      if (text.length > best.length) best = text;
+    });
+    body = best.length >= 20 ? best : null;
+  }
 
   // 이 사이트의 실제 첨부/본문 이미지는 전부 /board/attach/ 경로로 업로드됩니다.
-  // 이 패턴에 맞는 이미지를 우선 채택하고, 없을 때만 스코프 내 다른 이미지로 보완합니다.
+  // 이 패턴에 맞는 이미지를 우선 채택하고, 없을 때만 같은 스코프 내 다른 이미지로 보완합니다.
   const seen = new Set();
   const images = [];
   const pushImg = (src) => {
@@ -83,12 +100,12 @@ export function extractDetail(html) {
       /* 잘못된 URL은 건너뜀 */
     }
   };
-  scope.find('img').each((_, img) => {
+  imgScope.find('img').each((_, img) => {
     const src = $(img).attr('src');
     if (src && /\/board\/attach\//i.test(src)) pushImg(src);
   });
   if (images.length === 0) {
-    scope.find('img').each((_, img) => pushImg($(img).attr('src')));
+    imgScope.find('img').each((_, img) => pushImg($(img).attr('src')));
   }
 
   return { title, body, images, blocked: LOGIN_WALL.test(html) };
