@@ -5,7 +5,7 @@
 //   node tools/board-survey.mjs [조회할 페이지 수, 기본 8]
 import config from '../config.js';
 import { getHtml } from '../src/http.js';
-import { login, extractDetail } from '../src/detail.js';
+import { login, extractDetail, debugScopeHtml } from '../src/detail.js';
 import { parseRecentPosts } from '../src/recentPosts.js';
 
 const PAGES = Number(process.argv[2] ?? 8);
@@ -47,6 +47,13 @@ for (const [label, it] of samples) {
     console.log(`  body 길이: ${d.body?.length ?? 0}자  |  images: ${d.images.length}장`);
     console.log(`  body 미리보기: ${(d.body ?? '(없음)').slice(0, 80).replace(/\n/g, ' ')}`);
     console.log(`  blocked(로그인벽 감지): ${d.blocked}`);
+
+    // body가 0인데 title/이미지는 있으면, 진짜 이미지만 있는 글인지 템플릿이
+    // 달라서 .view-content-box를 못 찾은 것인지 원본으로 직접 확인합니다.
+    if (!d.body) {
+      console.log(`  --- 스코프 원본 (body=0이라 자동 덤프) ---`);
+      console.log(debugScopeHtml(html, 3000));
+    }
   } catch (err) {
     console.log(`[${label}] 취득 실패: ${err.message}`);
   }
