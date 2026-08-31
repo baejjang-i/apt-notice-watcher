@@ -8,7 +8,7 @@ const ARG = {
   hibasicCode: 0, writeUrl: 1, pageKind: 7, code: 8, midId: 10, tinyId: 11,
 };
 
-function parseGoViewArgs(href = '') {
+export function parseGoViewArgs(href = '') {
   const m = href.match(/go_view_hn\(([^)]*)\)/);
   if (!m) return null;
   const args = m[1].split(',').map((s) => s.trim().replace(/^'|'$/g, ''));

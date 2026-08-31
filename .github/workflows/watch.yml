@@ -12,7 +12,7 @@ on:
         required: false
         default: 'normal'
         type: choice
-        options: [normal, seed, dry-run, login-test, login-test-dump, notify-test, alert-test, telegram-diag, admin-bot-diag, band-diag, test-post, rpost-dump]
+        options: [normal, seed, dry-run, login-test, login-test-dump, notify-test, alert-test, telegram-diag, admin-bot-diag, band-diag, test-post, rpost-dump, allposts-diag, allposts-bot-diag]
       post_title:
         description: 'test-post 모드일 때만: 글 제목'
         required: false
@@ -54,6 +54,9 @@ jobs:
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
           BAND_ACCESS_TOKEN: ${{ secrets.BAND_ACCESS_TOKEN }}
           BAND_KEY: ${{ secrets.BAND_KEY }}
+          ALLPOSTS_BOT_TOKEN: ${{ secrets.ALLPOSTS_BOT_TOKEN }}
+          ALLPOSTS_CHAT_ID: ${{ secrets.ALLPOSTS_CHAT_ID }}
+          ALLPOSTS_CHANNEL_ID: ${{ secrets.ALLPOSTS_CHANNEL_ID }}
         run: |
           case "${{ inputs.mode }}" in
             seed)             node src/index.js --seed ;;
@@ -67,7 +70,30 @@ jobs:
             band-diag)        node tools/band-diag.mjs ;;
             test-post)        node tools/test-post.mjs "${{ inputs.post_title }}" "${{ inputs.post_url }}" ;;
             rpost-dump)       node tools/rpost-dump.mjs ;;
+            allposts-diag)    node src/allposts.js --dry-run ;;
+            allposts-bot-diag) TELEGRAM_BOT_TOKEN="$ALLPOSTS_BOT_TOKEN" node tools/telegram-chatid.mjs ;;
             *)                node src/index.js ;;
+          esac
+
+      - name: 전체 게시글 감시 (공지사항 제외)
+        # 진단 전용 모드(login-test 등)에서는 건너뜁니다. schedule 트리거·normal·seed·dry-run에서 실행됩니다.
+        if: >-
+          always() &&
+          !contains(
+            fromJSON('["login-test","login-test-dump","notify-test","alert-test","telegram-diag","admin-bot-diag","band-diag","test-post","rpost-dump","allposts-diag","allposts-bot-diag"]'),
+            github.event.inputs.mode
+          )
+        env:
+          SITE_ID: ${{ secrets.SITE_ID }}
+          SITE_PW: ${{ secrets.SITE_PW }}
+          ALLPOSTS_BOT_TOKEN: ${{ secrets.ALLPOSTS_BOT_TOKEN }}
+          ALLPOSTS_CHAT_ID: ${{ secrets.ALLPOSTS_CHAT_ID }}
+          ALLPOSTS_CHANNEL_ID: ${{ secrets.ALLPOSTS_CHANNEL_ID }}
+        run: |
+          case "${{ inputs.mode }}" in
+            seed)      node src/allposts.js --seed ;;
+            dry-run)   node src/allposts.js --dry-run ;;
+            *)         node src/allposts.js ;;
           esac
 
       - name: 상태 저장

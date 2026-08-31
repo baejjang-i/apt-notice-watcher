@@ -81,6 +81,9 @@ GitHub Actions에서 5분마다 자동 실행되며, 서버가 필요 없고 비
 | `TELEGRAM_ADMIN_CHAT_ID` | (선택) 그 봇에서 확인한 본인 chat_id |
 | `BAND_ACCESS_TOKEN` | (선택) 네이버 밴드 개발자센터에서 발급한 토큰 |
 | `BAND_KEY` | (선택) 발행할 밴드의 band_key (`band-diag`로 확인) |
+| `ALLPOSTS_BOT_TOKEN` | (선택) "전체 게시글" 감시봇 토큰 |
+| `ALLPOSTS_CHAT_ID` | (선택) 그 봇에서 확인한 수신 chat_id |
+| `ALLPOSTS_CHANNEL_ID` | (선택) 그 봇의 구독용 채널 ID |
 
 ### 3-1. (선택) 입주민 구독용 텔레그램 채널
 
@@ -139,12 +142,33 @@ GitHub Actions에서 5분마다 자동 실행되며, 서버가 필요 없고 비
 > 글에 "첨부 사진 N장은 위 링크에서 확인하세요"가 자동으로 붙습니다.
 > 토큰이 만료되면(`result_code 10401`) 3단계를 다시 하면 됩니다.
 
+### 3-4. (선택) "전체 게시글" 감시봇 — 공지사항 제외 전 게시판
+
+공지사항 봇은 `[생활지원센터-공지사항]` 게시판만 봅니다. 민원게시판·선거관리위원회·계약서 등
+**그 외 모든 게시판**의 새 글을 놓치지 않으려면 별도 봇을 하나 더 둡니다. 로그인이 필요한
+전 게시판 통합 "최근게시글" 목록(`page_kind=rpost`)을 읽어, 공지사항만 제외하고 알립니다.
+
+여러 게시판이 서로 다른 템플릿을 쓸 수 있어, 이 봇은 **제목·게시판 분류·작성일·링크만**
+보냅니다(본문·이미지는 가져오지 않음 — 공지사항 봇과 다른 점).
+
+1. `@BotFather`에서 세 번째 봇 생성 (예: `도파타 전체알림`) → 토큰 받기
+2. 그 봇과 대화 시작해 아무 메시지나 한 번 보내기
+3. chat_id 확인 — Actions 탭에서 mode를 **`allposts-bot-diag`**로 실행
+4. 토큰은 `ALLPOSTS_BOT_TOKEN`, chat_id는 `ALLPOSTS_CHAT_ID` Secret으로 등록
+5. (선택) 입주민 채널과 같은 방식으로 채널을 만들어 관리자가 추가하고 `ALLPOSTS_CHANNEL_ID`도 등록하면,
+   구독자에게도 함께 발행됩니다
+
+> 어느 게시판을 제외할지는 `config.js`의 `allPosts.excludeBoardLabelIncludes`
+> (기본값 `['생활지원센터-공지사항']`)로 조정합니다. 다른 게시판도 더 빼려면
+> 배열에 게시판 라벨 문자열(예: `'주민자치회-선거관리위원회'`)을 추가하면 됩니다.
+
 ### 4. 첫 실행 (시딩)
 
 Actions 탭 → **공지사항 감시** → Run workflow → mode에 **`seed`** 선택
 
 기존 공지 9건을 "이미 본 것"으로 기록만 하고 발송하지 않습니다.
 **이 단계를 건너뛰면 첫 실행에서 기존 글이 한꺼번에 날아옵니다.**
+같은 `seed` 실행이 "전체 게시글" 감시봇도 함께 시딩합니다(3-4단계를 설정했다면).
 
 이후부터는 자동으로 주기적으로 돌며, 새 글이 있을 때만 알림이 옵니다.
 
@@ -212,14 +236,20 @@ heartbeatHourKst: 9                // null이면 하트비트 끔
 config.js                 감시 대상·필터·채널 설정 (대부분 여기만 고치면 됨)
 src/
   http.js                 소켓 기반 HTTP 클라이언트 (EUC-KR, 쿠키, 재시도)
-  parse.js                메인 페이지 공지 목록 파서
+  parse.js                메인 페이지 공지 목록 파서 (go_view_hn 인자 파서 포함)
+  recentPosts.js          전 게시판 통합 "최근게시글"(rpost) 목록 파서
   detail.js               로그인 및 상세 본문 추출
-  state.js                본 글번호 관리
+  messages.js             발송 문구 조립 (카카오 예산 계산 등)
+  state.js                본 글번호 관리 (경로 지정 가능 — 파이프라인별 분리)
   notify/
     kakao.js              카카오 나에게 보내기
-    telegram.js           텔레그램
-    index.js              발송 라우팅 및 폴백
-  index.js                전체 흐름
+    telegram.js           텔레그램 (개인·채널·관리자봇·전체게시글봇 공용)
+    band.js                네이버 밴드 Open API
+    index.js               발송 라우팅 및 폴백
+  index.js                공지사항 파이프라인 (본문·이미지 포함)
+  allposts.js              전체 게시글 파이프라인 (공지사항 제외, 제목만)
 tools/                    설정·진단용 스크립트
-state/seen.json           확인한 글번호 (Actions가 자동 커밋)
+state/seen.json           공지사항 파이프라인이 확인한 글번호
+state/seen-allposts.json  전체 게시글 파이프라인이 확인한 글번호
+(둘 다 Actions가 자동 커밋)
 ```

@@ -78,4 +78,15 @@ export default {
   emptyParseAlertThreshold: 3,
 
   statePath: 'state/seen.json',
+
+  // "전체 게시글" 감시 (공지사항 전용 알림과는 별도 파이프라인).
+  // 로그인 후 /d_c/sub/page.php?page_kind=rpost (전 게시판 통합 최근글) 목록을 읽어,
+  // 아래 라벨을 포함한 게시판만 제외하고 나머지 전부를 새 텔레그램 봇으로 발송합니다.
+  // 여러 게시판 템플릿이 섞여 있어 본문/이미지는 가져오지 않고 제목·게시판·링크만 보냅니다.
+  allPosts: {
+    enabled: true,
+    listUrl: 'http://www.doduck.co.kr/d_c/sub/page.php?page_kind=rpost',
+    excludeBoardLabelIncludes: ['생활지원센터-공지사항'],
+    statePath: 'state/seen-allposts.json',
+  },
 };

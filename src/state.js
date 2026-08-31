@@ -13,8 +13,8 @@ const EMPTY = {
   kakaoFailStreak: 0,
 };
 
-export function loadState() {
-  const p = path.resolve(config.statePath);
+export function loadState(statePath = config.statePath) {
+  const p = path.resolve(statePath);
   if (!fs.existsSync(p)) return { ...EMPTY };
   try {
     return { ...EMPTY, ...JSON.parse(fs.readFileSync(p, 'utf8')) };
@@ -24,8 +24,8 @@ export function loadState() {
   }
 }
 
-export function saveState(state) {
-  const p = path.resolve(config.statePath);
+export function saveState(state, statePath = config.statePath) {
+  const p = path.resolve(statePath);
   fs.mkdirSync(path.dirname(p), { recursive: true });
   const trimmed = {
     ...state,

@@ -40,7 +40,7 @@ export async function login(probeUrl) {
 // 좌측 칸에는 "소장인사말 직원현황 관리계획서 …" 같은 메뉴 텍스트가 줄줄이 이어져 있어,
 // 실제 본문이 "이미지만 있고 텍스트가 거의 없는" 글일 경우 이 메뉴 쪽이 더 길어서
 // 본문으로 잘못 뽑히는 문제가 있었습니다. 아예 스코프를 오른쪽 칸으로 좁혀 원천 차단합니다.
-function contentScope($) {
+export function pageContentScope($) {
   // cheerio가 HTML5 파서로 tbody를 자동 삽입하므로 두 형태를 모두 지원합니다.
   const scope = $('table.body_layout_c > tbody > tr > td, table.body_layout_c > tr > td').last();
   return scope.length ? scope : $('body'); // 템플릿이 다른 페이지면 문서 전체로 완화
@@ -56,7 +56,7 @@ function contentScope($) {
 export function extractDetail(html) {
   const $ = cheerio.load(html);
   $('script, style, noscript, iframe').remove();
-  const scope = contentScope($);
+  const scope = pageContentScope($);
 
   const titleEl = scope.find('.board_vtit').first();
   let title = titleEl.length ? titleEl.text().trim() : null;
@@ -116,7 +116,7 @@ export function extractDetail(html) {
 export function debugScopeHtml(html, maxLen = 4000) {
   const $ = cheerio.load(html);
   $('script, style, noscript, iframe').remove();
-  const scope = contentScope($);
+  const scope = pageContentScope($);
   return ($.html(scope) ?? '').slice(0, maxLen);
 }
 

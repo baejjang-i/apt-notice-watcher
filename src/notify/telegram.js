@@ -38,6 +38,24 @@ export async function sendTelegramAdmin(text) {
   await sendTelegram(text, chatId, token);
 }
 
+// "전체 게시글" 감시봇 (공지사항 제외 전 게시판). 미설정이면 조용히 건너뜁니다.
+export async function sendAllPosts(text) {
+  const token = process.env.ALLPOSTS_BOT_TOKEN;
+  const chatId = process.env.ALLPOSTS_CHAT_ID;
+  if (!token || !chatId) return false;
+  await sendTelegram(text, chatId, token);
+  return true;
+}
+
+// (선택) 전체 게시글 봇의 구독용 채널.
+export async function sendAllPostsChannel(text) {
+  const token = process.env.ALLPOSTS_BOT_TOKEN;
+  const channelId = process.env.ALLPOSTS_CHANNEL_ID;
+  if (!token || !channelId) return false;
+  await sendTelegram(text, channelId, token);
+  return true;
+}
+
 function requireNoticeBotToken() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN 환경변수가 없습니다');
