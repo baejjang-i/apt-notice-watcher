@@ -94,6 +94,15 @@ export function extractDetail(html) {
   return { title, body, images, blocked: LOGIN_WALL.test(html) };
 }
 
+// 진단용: 스코프로 잡은 영역의 실제 HTML을 그대로 보여줍니다.
+// 휴리스틱이 엉뚱한 블록을 고를 때 원인 파악용으로만 씁니다.
+export function debugScopeHtml(html, maxLen = 4000) {
+  const $ = cheerio.load(html);
+  $('script, style, noscript, iframe').remove();
+  const scope = contentScope($);
+  return ($.html(scope) ?? '').slice(0, maxLen);
+}
+
 export async function fetchDetail(item) {
   const html = await getHtml(item.url, { label: `상세 ${item.id}` });
   const d = extractDetail(html);

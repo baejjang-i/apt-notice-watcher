@@ -2,13 +2,14 @@ import config from '../config.js';
 import { getHtml } from './http.js';
 import { parseNoticeList, applyFilters } from './parse.js';
 import { loadState, saveState, pickNew } from './state.js';
-import { login, fetchDetail, fetchImages, LoginError } from './detail.js';
+import { login, fetchDetail, fetchImages, debugScopeHtml, LoginError } from './detail.js';
 import * as notifier from './notify/index.js';
 
 const args = new Set(process.argv.slice(2));
 const SEED = args.has('--seed');
 const DRY = args.has('--dry-run');
 const LOGIN_TEST = args.has('--login-test');
+const DUMP = args.has('--dump');
 
 const kstNow = () => new Date(Date.now() + 9 * 60 * 60 * 1000);
 const kstDate = () => kstNow().toISOString().slice(0, 10);
@@ -51,6 +52,11 @@ async function main() {
     console.log(`  제목: ${d.title}`);
     console.log(`  본문(${d.body?.length ?? 0}자): ${(d.body ?? '(없음)').slice(0, 300)}`);
     console.log(`  이미지(${d.images.length}장): ${d.images.join(', ') || '(없음)'}`);
+    if (DUMP) {
+      const html = await getHtml(probe.url, { label: '상세(덤프용)' });
+      console.log('\n--- 스코프 HTML 덤프 ---');
+      console.log(debugScopeHtml(html));
+    }
     return;
   }
 
