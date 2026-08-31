@@ -3,6 +3,7 @@ import { getHtml } from './http.js';
 import { parseNoticeList, applyFilters } from './parse.js';
 import { loadState, saveState, pickNew } from './state.js';
 import { login, fetchDetail, fetchImages, debugScopeHtml, LoginError } from './detail.js';
+import { TEXT_LIMIT as KAKAO_TEXT_LIMIT } from './notify/kakao.js';
 import * as notifier from './notify/index.js';
 
 const args = new Set(process.argv.slice(2));
@@ -14,14 +15,39 @@ const DUMP = args.has('--dump');
 const kstNow = () => new Date(Date.now() + 9 * 60 * 60 * 1000);
 const kstDate = () => kstNow().toISOString().slice(0, 10);
 
+// detail이 null이면 "취득 자체를 못 한 것"(로그인 실패 등)이고,
+// detail은 있는데 detail.body가 null이면 "실제로 본문 내용이 없는 글"입니다.
+// (이 사이트는 이미지만 첨부하고 텍스트는 안 쓰는 공지가 많습니다.)
+function resolveBodyText(detail) {
+  if (!detail) return '(본문을 가져오지 못했습니다. 링크에서 확인해 주세요)';
+  if (!detail.body) return '(본문 내용은 없습니다.)';
+  return detail.body.slice(0, config.detail.maxBodyChars);
+}
+
+// 카카오는 195자 제한이라, 링크가 잘려서 깨지지 않도록 URL 몫을 먼저 떼어두고
+// 남는 공간에 제목·날짜·본문을 채웁니다. (카카오 버튼 링크만 믿으면 안 되는 이유는
+// 아래 kakao.js의 link 필드 주석 참고 — 텍스트에도 링크를 그대로 노출합니다.)
+function buildKakaoText(title, postedAt, body, url) {
+  const urlPart = `\n\n${url}`;
+  const headBudget = KAKAO_TEXT_LIMIT - urlPart.length;
+  const head = `[새 공지] ${title}\n${postedAt}`;
+
+  if (head.length > headBudget) {
+    return head.slice(0, Math.max(0, headBudget - 1)) + '…' + urlPart;
+  }
+  const bodyBudget = headBudget - head.length - 2; // '\n\n' 몫
+  if (bodyBudget > 10 && body) {
+    const bodyPart = body.length > bodyBudget ? body.slice(0, bodyBudget - 1) + '…' : body;
+    return `${head}\n\n${bodyPart}${urlPart}`;
+  }
+  return head + urlPart;
+}
+
 function buildMessages(item, detail) {
   const title = detail?.title || item.titleShort;
-  const body = detail?.body
-    ? detail.body.slice(0, config.detail.maxBodyChars)
-    : '(본문을 가져오지 못했습니다. 링크에서 확인해 주세요)';
+  const body = resolveBodyText(detail);
 
-  // 카카오는 195자 제한이라 제목 위주 + 본문 앞부분만 담깁니다.
-  const kakaoText = `[새 공지] ${title}\n${item.postedAt}\n\n${body}`;
+  const kakaoText = buildKakaoText(title, item.postedAt, body, item.url);
 
   const fullText =
     `📢 새 공지 · ${config.site.name}\n\n` +

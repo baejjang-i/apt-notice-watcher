@@ -1,6 +1,6 @@
 import config from '../../config.js';
 import { getAccessToken, sendKakaoMemo } from './kakao.js';
-import { sendTelegram, sendTelegramChannel, sendTelegramImages } from './telegram.js';
+import { sendTelegram, sendTelegramChannel, sendTelegramImages, sendTelegramAdmin } from './telegram.js';
 
 // 카카오 토큰은 실행당 한 번만 발급받아 재사용합니다.
 let cachedToken = null;
@@ -93,7 +93,10 @@ export async function sendImages(images) {
   return out;
 }
 
-// 운영 경보는 본문 없이 짧게, 두 채널 모두에 시도합니다.
+// 운영 경보(로그인 실패·파싱 오류·하트비트 등). 텔레그램은 공지 알림 봇과 분리된
+// 관리자 전용 봇으로 보내, 평소 안 오던 채널에서 메시지가 오면 그 자체로 "뭔가 문제"
+// 신호가 되게 합니다. 관리자 봇을 아직 안 만들었으면 공지 알림 봇으로 자동 대체됩니다
+// (sendTelegramAdmin 내부 폴백).
 export async function alert(message) {
   const text = `[공지알리미 경보]\n${message}`;
   const out = { kakao: 'off', telegram: 'off' };
@@ -102,8 +105,8 @@ export async function alert(message) {
     catch (err) { out.kakao = 'failed'; console.error(`[alert] 카카오 실패: ${err.message}`); }
   }
   if (config.notify.telegram.enabled) {
-    try { await sendTelegram(text); out.telegram = 'sent'; }
-    catch (err) { out.telegram = 'failed'; console.error(`[alert] 텔레그램 실패: ${err.message}`); }
+    try { await sendTelegramAdmin(text); out.telegram = 'sent'; }
+    catch (err) { out.telegram = 'failed'; console.error(`[alert] 텔레그램(관리자) 실패: ${err.message}`); }
   }
   return out;
 }
