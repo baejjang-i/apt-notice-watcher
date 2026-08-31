@@ -9,4 +9,4 @@ console.log('로그인 성공.\n');
 const html = await getHtml(url, { label: 'rpost' });
 console.log('전체 길이:', html.length);
 console.log('\n--- 스코프 HTML (앞 6000자) ---');
-console.log(debugScopeHtml(html, 6000));
+console.log(debugScopeHtml(html, 30000));
