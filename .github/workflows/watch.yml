@@ -12,7 +12,7 @@ on:
         required: false
         default: 'normal'
         type: choice
-        options: [normal, seed, dry-run, login-test, login-test-dump, notify-test, alert-test, telegram-diag, admin-bot-diag, band-diag, test-post, rpost-dump, allposts-diag, allposts-bot-diag]
+        options: [normal, seed, dry-run, login-test, login-test-dump, notify-test, alert-test, telegram-diag, admin-bot-diag, band-diag, test-post, rpost-dump, allposts-diag, allposts-bot-diag, board-survey]
       post_title:
         description: 'test-post 모드일 때만: 글 제목'
         required: false
@@ -72,6 +72,7 @@ jobs:
             rpost-dump)       node tools/rpost-dump.mjs ;;
             allposts-diag)    node src/allposts.js --dry-run ;;
             allposts-bot-diag) TELEGRAM_BOT_TOKEN="$ALLPOSTS_BOT_TOKEN" node tools/telegram-chatid.mjs ;;
+            board-survey)     node tools/board-survey.mjs ;;
             *)                node src/index.js ;;
           esac
 
@@ -80,7 +81,7 @@ jobs:
         if: >-
           always() &&
           !contains(
-            fromJSON('["login-test","login-test-dump","notify-test","alert-test","telegram-diag","admin-bot-diag","band-diag","test-post","rpost-dump","allposts-diag","allposts-bot-diag"]'),
+            fromJSON('["login-test","login-test-dump","notify-test","alert-test","telegram-diag","admin-bot-diag","band-diag","test-post","rpost-dump","allposts-diag","allposts-bot-diag","board-survey"]'),
             github.event.inputs.mode
           )
         env:
