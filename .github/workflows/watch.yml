@@ -12,7 +12,13 @@ on:
         required: false
         default: 'normal'
         type: choice
-        options: [normal, seed, dry-run, login-test, login-test-dump, notify-test, alert-test, telegram-diag, admin-bot-diag, band-diag]
+        options: [normal, seed, dry-run, login-test, login-test-dump, notify-test, alert-test, telegram-diag, admin-bot-diag, band-diag, test-post]
+      post_title:
+        description: 'test-post 모드일 때만: 글 제목'
+        required: false
+      post_url:
+        description: 'test-post 모드일 때만: 글 상세 URL'
+        required: false
 
 concurrency:
   group: notice-watch
@@ -59,6 +65,7 @@ jobs:
             telegram-diag)    node tools/telegram-chatid.mjs ;;
             admin-bot-diag)   TELEGRAM_BOT_TOKEN="$TELEGRAM_ADMIN_BOT_TOKEN" node tools/telegram-chatid.mjs ;;
             band-diag)        node tools/band-diag.mjs ;;
+            test-post)        node tools/test-post.mjs "${{ inputs.post_title }}" "${{ inputs.post_url }}" ;;
             *)                node src/index.js ;;
           esac
 
