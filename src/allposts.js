@@ -1,12 +1,18 @@
 // "전체 게시글" 감시 — 공지사항(생활지원센터-공지사항)을 제외한 사이트 내 모든 게시판의
-// 새 글을 별도 텔레그램 봇으로 알립니다. 여러 게시판 템플릿이 섞여 있어 본문/이미지는
-// 가져오지 않고 제목·게시판·작성일·링크만 보냅니다(공지사항 봇과는 완전히 분리된 파이프라인).
+// 새 글을 별도 텔레그램 봇으로 알립니다.
+//
+// board-survey 조사 결과(2026-08-31), 실제 활동 중인 게시판 5개
+// (공지사항·민원게시판·선거관리위원회·자유게시판·계약서)가 전부 공지사항과 동일한
+// 상세 템플릿(.board_vtit / .view-content-box)을 쓰는 것을 확인했습니다. 그래서 이
+// 파이프라인도 공지사항 파이프라인과 동일하게 본문·이미지까지 전부 가져옵니다.
+// 새 게시판이 생겨 템플릿이 다르면 detail.js의 폴백 휴리스틱이 대신 동작합니다.
 import config from '../config.js';
 import { getHtml } from './http.js';
-import { login } from './detail.js';
+import { login, fetchDetail, fetchImages, LoginError } from './detail.js';
+import { resolveBodyText } from './messages.js';
 import { parseRecentPosts, excludeConfiguredBoards } from './recentPosts.js';
 import { loadState, saveState, pickNew } from './state.js';
-import { sendAllPosts, sendAllPostsChannel } from './notify/telegram.js';
+import { sendAllPosts, sendAllPostsChannel, sendTelegramImages } from './notify/telegram.js';
 
 const args = new Set(process.argv.slice(2));
 const SEED = args.has('--seed');
@@ -14,8 +20,10 @@ const DRY = args.has('--dry-run');
 
 const STATE_PATH = config.allPosts.statePath;
 
-function buildLine(item) {
-  return `🆕 [${item.boardLabel}] ${item.titleShort}\n${item.postedAt}\n${item.url}`;
+function buildText(item, detail) {
+  const title = detail?.title || item.titleShort;
+  const body = resolveBodyText(detail);
+  return `🆕 [${item.boardLabel}] ${title}\n${item.postedAt}\n\n${body}\n\n${item.url}`;
 }
 
 async function main() {
@@ -27,8 +35,10 @@ async function main() {
   const state = loadState(STATE_PATH);
 
   // 이 목록(rpost)은 공지 위젯과 달리 로그인 없이는 볼 수 없습니다.
+  let loggedIn = false;
   try {
     await login(config.allPosts.listUrl);
+    loggedIn = true;
   } catch (err) {
     // 로그인 실패 경보는 공지 파이프라인(src/index.js)이 이미 보내므로 여기서는 중복 발송하지 않습니다.
     console.error(`[allposts] 로그인 실패: ${err.message}`);
@@ -55,11 +65,30 @@ async function main() {
     return;
   }
 
+  const botToken = process.env.ALLPOSTS_BOT_TOKEN;
+  const chatId = process.env.ALLPOSTS_CHAT_ID;
+  const channelId = process.env.ALLPOSTS_CHANNEL_ID;
+
   for (const item of fresh) {
-    const text = buildLine(item);
+    let detail = null;
+    let images = [];
+    if (loggedIn) {
+      try {
+        detail = await fetchDetail(item);
+        if (config.detail.includeImages && detail.images?.length) {
+          images = await fetchImages(detail.images);
+        }
+      } catch (err) {
+        console.error(`[allposts] 상세 취득 실패 (${item.id}): ${err.message}`);
+        if (err instanceof LoginError) loggedIn = false; // 세션 끊김 — 이후 시도 생략, 제목만으로 발송
+      }
+    }
+
+    const text = buildText(item, detail);
 
     if (DRY) {
       console.log('\n--- DRY RUN ---\n' + text);
+      if (images.length) console.log(`(이미지 ${images.length}장 첨부 예정)`);
       continue;
     }
 
@@ -77,10 +106,21 @@ async function main() {
     }
     console.log(`[allposts send] ${item.id} personal=${personal ? 'sent' : 'off'} channel=${channel ? 'sent' : 'off'}`);
 
+    if (images.length && botToken && (personal || channel)) {
+      if (chatId) {
+        await sendTelegramImages(chatId, images, botToken)
+          .catch((err) => console.error(`[allposts] 개인 이미지 발송 실패 (${item.id}): ${err.message}`));
+      }
+      if (channelId) {
+        await sendTelegramImages(channelId, images, botToken)
+          .catch((err) => console.error(`[allposts] 채널 이미지 발송 실패 (${item.id}): ${err.message}`));
+      }
+    }
+
     // 어느 한 쪽이라도 성공해야 "본 것"으로 처리. 봇 미설정 시 다음 실행에서 재시도됩니다.
     if (personal || channel) state.seenIds.push(item.id);
 
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 800));
   }
 
   saveState(state, STATE_PATH);
