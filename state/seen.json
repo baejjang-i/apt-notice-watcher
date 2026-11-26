@@ -1,6 +1,7 @@
 {
   "seeded": true,
   "seenIds": [
+    "9913",
     "9906",
     "9905",
     "9903",
@@ -109,7 +110,7 @@
     "9758"
   ],
   "emptyParseStreak": 0,
-  "lastRunAt": "2026-11-25T23:33:33.678Z",
+  "lastRunAt": "2026-11-26T05:26:33.526Z",
   "lastHeartbeatDate": "2026-11-19",
-  "kakaoFailStreak": 2
+  "kakaoFailStreak": 0
 }
